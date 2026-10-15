@@ -5,6 +5,13 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
 <title>Two-Person Chat</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.png">
+<link rel="apple-touch-icon" href="icon.png">
+<meta name="theme-color" content="#1f5f73">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Chat">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gloock&family=Nunito+Sans:opsz,wght@6..12,400;6..12,600;6..12,700&display=swap">
 <style>
@@ -67,6 +74,40 @@ h1 { margin: 0; font-family: var(--font-display); font-weight: 400; font-size: 1
 #recbar #recsend { padding: 9px 18px; }
 #lightbox { position: fixed; inset: 0; background: rgba(0,0,0,.9); display: flex; align-items: center; justify-content: center; z-index: 10; }
 #lightbox img { max-width: 100%; max-height: 100%; }
+.bubble.gone { font-style: italic; opacity: .6; }
+#sheet { position: fixed; inset: 0; background: rgba(0,0,0,.4); display: flex; align-items: flex-end; z-index: 9; }
+#sheet .card { width: 100%; background: var(--surface); padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px)); display: flex; flex-direction: column; gap: 8px; }
+#sheet button { padding: 12px; }
+#sdel { background: #e5484d; color: #fff; }
+#call { position: fixed; inset: 0; z-index: 20; background: rgba(15,23,29,.97); color: #e4ecf1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; text-align: center; }
+#calltext { font-family: var(--font-display); font-size: 1.6rem; }
+#call .row { display: flex; gap: 12px; margin-top: 18px; }
+#call button { padding: 14px 22px; }
+#callyes { background: #2f9e5b; color: #fff; }
+#callno { background: #e5484d; color: #fff; }
+.sub { flex-wrap: wrap; }
+#remote, #local { position: absolute; background: #000; opacity: 0; pointer-events: none; }
+#remote { inset: 0; width: 100%; height: 100%; object-fit: cover; }
+#local { top: calc(12px + env(safe-area-inset-top, 0px)); right: 12px; width: 96px; height: 128px; object-fit: cover; border-radius: 12px; z-index: 4; transform: scaleX(-1); }
+#call.vid #remote, #call.vid #local { opacity: 1; }
+#call.vid { justify-content: flex-end; padding-bottom: calc(28px + env(safe-area-inset-bottom, 0px)); }
+#calltext, #callsub, #call .row { position: relative; z-index: 3; }
+#call.vid #calltext, #call.vid #callsub { text-shadow: 0 1px 6px rgba(0,0,0,.8); }
+@keyframes pop { from { opacity: 0; transform: translateY(8px) scale(.96); } to { opacity: 1; transform: none; } }
+.msg.new { animation: pop .2s ease-out; }
+@media (prefers-reduced-motion: reduce) { .msg.new { animation: none; } }
+.msg.flash .bubble { outline: 2px solid var(--accent); }
+.quote { border-left: 3px solid var(--accent); padding: 2px 8px; margin-bottom: 4px; font-size: .8rem; opacity: .85; cursor: pointer; }
+.rx { display: flex; gap: 4px; margin-top: -4px; padding: 0 6px; }
+.chip { font-size: .75rem; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 1px 7px; color: var(--fg); }
+.chip.me { border-color: var(--accent); }
+#reactrow { display: flex; justify-content: space-around; }
+#reactrow button { background: none; font-size: 1.7rem; padding: 4px; }
+.msg .bubble { cursor: pointer; }
+.ava { border-radius: 50%; object-fit: cover; background: var(--line); flex: none; }
+.ava.s { width: 22px; height: 22px; }
+.who .ava { width: 18px; height: 18px; vertical-align: middle; margin-right: 5px; }
+#jump { position: fixed; right: 16px; bottom: calc(84px + env(safe-area-inset-bottom, 0px)); width: 40px; height: 40px; padding: 0; z-index: 5; box-shadow: 0 2px 8px rgba(0,0,0,.25); }
 .time { font-size: .68rem; color: var(--muted); padding: 0 6px; font-variant-numeric: tabular-nums; }
 form {
   display: flex; gap: 8px; padding: 10px 16px; padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
@@ -92,7 +133,7 @@ button.link { background: none; color: var(--accent); padding: 0 4px; font-size:
 <header>
   <div>
     <h1>Two-Person Chat</h1>
-    <div class="sub" id="subrow" hidden><span id="presence"></span><button class="link" id="rcpt" type="button"></button></div>
+    <div class="sub" id="subrow" hidden><img id="fava" class="ava s" alt="" hidden><span id="presence"></span><button class="link" id="rcpt" type="button"></button><button class="link" id="callbtn" type="button">📞 Call</button><button class="link" id="vcallbtn" type="button">🎥 Video</button><img id="mava" class="ava s" alt="" hidden><button class="link" id="photobtn" type="button">Photo</button></div>
   </div>
   <span><span class="status" id="status">Connecting…</span> <button class="link" id="signout" hidden>Sign out</button></span>
 </header>
@@ -107,6 +148,8 @@ button.link { background: none; color: var(--accent); padding: 0 4px; font-size:
   <div class="empty" id="empty"><strong>No messages yet</strong>Type below to say hi. Your friend will see it when they open this page.</div>
 </div>
 
+<div class="note" id="replybar" hidden><span id="replytext"></span> <button type="button" class="link" id="replycancel">Cancel</button></div>
+<div class="note" id="editbar" hidden>Editing message <button type="button" class="link" id="editcancel">Cancel</button></div>
 <div id="stickers" hidden></div>
 <div id="recbar" hidden><span class="dot">●</span><span class="grow" id="rectime">0:00</span><button type="button" class="link" id="reccancel">Cancel</button><button type="button" id="recsend">Send</button></div>
 <form id="composer" hidden>
@@ -120,13 +163,17 @@ button.link { background: none; color: var(--accent); padding: 0 4px; font-size:
 </form>
 <input type="file" id="pick" accept="image/*" hidden>
 <div id="lightbox" hidden><img alt=""></div>
+<button id="jump" type="button" hidden aria-label="Jump to latest">↓</button>
+<input type="file" id="avapick" accept="image/*" hidden>
+<div id="sheet" hidden><div class="card"><div id="reactrow"></div><button type="button" id="sreply">Reply</button><button type="button" id="sedit">Edit</button><button type="button" id="sdel">Delete for everyone</button><button type="button" class="link" id="scancel">Cancel</button></div></div>
+<div id="call" hidden><video id="remote" autoplay playsinline></video><video id="local" autoplay playsinline muted></video><div id="calltext"></div><div id="callsub"></div><div class="row"><button type="button" id="callyes">Answer</button><button type="button" id="callmute">Mute</button><button type="button" id="callno">End</button></div></div>
 <div class="note" id="denied" hidden>This account isn't allowed in this chat. Sign out and use the Google account that was given access.</div>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
 import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut }
   from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
-import { getFirestore, collection, addDoc, doc, setDoc, query, orderBy, limit, onSnapshot, serverTimestamp }
+import { getFirestore, collection, addDoc, doc, setDoc, updateDoc, deleteField, query, orderBy, limit, onSnapshot, serverTimestamp }
   from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 
 // Paste your Firebase web-app config here (Project settings → Your apps).
@@ -149,9 +196,10 @@ const messages = collection(db, 'messages');
 const statuses = collection(db, 'status');
 
 const $ = id => document.getElementById(id);
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 const log = $('log'), emptyEl = $('empty'), statusEl = $('status'), form = $('composer'),
       textEl = $('text'), sendBtn = $('send'), authEl = $('auth'), deniedEl = $('denied'), signoutBtn = $('signout');
-let me = null, unsub = null, unsubStatus = null, friend = null, newestTs = null, lastDocs = null, sentDelivered = 0, sentRead = 0, renderLater = false;
+let me = null, unsub = null, unsubStatus = null, friend = null, newestTs = null, lastDocs = null, sentDelivered = 0, sentRead = 0, renderLater = false, editing = null, sheetMsg = null, lastTyping = 0, unsubCalls = null, replying = null, meStatus = null;
 
 function fmtTime(ms) { return new Date(ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }); }
 function fmtDay(ms) {
@@ -165,7 +213,7 @@ function fmtDay(ms) {
 // Synchronous, so a stale render can never overwrite a newer one.
 function render(docs) {
   const msgs = docs
-    .map(d => ({ ...d.data({ serverTimestamps: 'estimate' }), pending: d.metadata.hasPendingWrites }))
+    .map(d => ({ ...d.data({ serverTimestamps: 'estimate' }), id: d.id, pending: d.metadata.hasPendingWrites }))
     .filter(m => typeof m.text === 'string' && m.ts && m.ts.toMillis)
     .reverse();
   lastDocs = docs;
@@ -189,11 +237,18 @@ function render(docs) {
     const mine = me && m.uid === me.uid;
     const wrap = document.createElement('div');
     wrap.className = 'msg ' + (mine ? 'mine' : 'theirs') + (m.pending ? ' pending' : '');
+    wrap.dataset.id = m.id;
+    const seen = render.seen || (render.seen = new Set());
+    if (!first && !seen.has(m.id)) wrap.classList.add('new');
+    seen.add(m.id);
     if (!mine && m.uid !== lastUid) {
-      const who = document.createElement('div'); who.className = 'who'; who.textContent = m.name || 'Friend'; wrap.append(who);
+      const who = document.createElement('div'); who.className = 'who';
+      if (friend && friend.photo) { const av = document.createElement('img'); av.className = 'ava'; av.alt = ''; av.src = friend.photo; who.append(av); }
+      who.append(document.createTextNode(m.name || 'Friend')); wrap.append(who);
     }
     const b = document.createElement('div'); b.className = 'bubble';
-    if (m.kind === 'image' && m.media) {
+    if (m.deleted) { b.classList.add('gone'); b.textContent = 'This message was deleted'; }
+    else if (m.kind === 'image' && m.media) {
       b.classList.add('media');
       const im = document.createElement('img'); im.src = m.media; im.alt = 'Photo';
       im.onload = () => { if (nearBottom || first) log.scrollTop = log.scrollHeight; };
@@ -205,8 +260,32 @@ function render(docs) {
       b.append(a);
     } else if (m.kind === 'sticker') { b.classList.add('sticker'); b.textContent = m.text; }
     else b.textContent = m.text;
-    const t = document.createElement('div'); t.className = 'time'; t.textContent = fmtTime(ms) + (mine ? ' · ' + tickFor(m, ms) : '');
-    wrap.append(b, t); log.append(wrap);
+    if (m.reply && !m.deleted && m.kind !== 'sticker') {
+      const q = document.createElement('div'); q.className = 'quote';
+      q.textContent = (m.reply.name || 'Message') + ': ' + (m.reply.text || '');
+      q.onclick = e => {
+        e.stopPropagation();
+        const el = log.querySelector('[data-id="' + m.reply.id + '"]');
+        if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.classList.add('flash'); setTimeout(() => el.classList.remove('flash'), 1200); }
+      };
+      b.prepend(q);
+    }
+    if (!m.deleted && !m.pending && (!m.kind || m.kind === 'text' || m.kind === 'sticker')) b.onclick = () => openSheet(m);
+    const t = document.createElement('div'); t.className = 'time'; t.textContent = fmtTime(ms) + (m.edited ? ' · edited' : '') + (mine ? ' · ' + tickFor(m, ms) : '');
+    if (!m.deleted && !m.pending) { t.textContent += ' ⋯'; t.style.cursor = 'pointer'; t.onclick = () => openSheet(m); }
+    wrap.append(b);
+    if (m.reactions && !m.deleted) {
+      const counts = {};
+      Object.values(m.reactions).forEach(r => { counts[r] = (counts[r] || 0) + 1; });
+      const rx = document.createElement('div'); rx.className = 'rx';
+      for (const r in counts) {
+        const c = document.createElement('span');
+        c.className = 'chip' + (me && m.reactions[me.uid] === r ? ' me' : '');
+        c.textContent = counts[r] > 1 ? r + ' ' + counts[r] : r; rx.append(c);
+      }
+      if (rx.children.length) wrap.append(rx);
+    }
+    wrap.append(t); log.append(wrap);
     lastUid = m.uid;
   }
   // Stick to the bottom only if already there; otherwise keep the reader's place
@@ -216,7 +295,11 @@ function render(docs) {
 
 function resize() { textEl.style.height = 'auto'; textEl.style.height = Math.min(textEl.scrollHeight, 120) + 'px'; }
 function updateSend() { sendBtn.disabled = !me || !textEl.value.trim(); }
-textEl.addEventListener('input', () => { resize(); updateSend(); });
+textEl.addEventListener('input', () => {
+  resize(); updateSend();
+  const n = Date.now();
+  if (textEl.value.trim() && n - lastTyping > 2500) { lastTyping = n; touch({ typingAt: serverTimestamp() }); }
+});
 
 // Enter sends only with a mouse/physical keyboard; on touch screens it inserts a newline
 const finePointer = window.matchMedia('(hover: hover) and (pointer: fine)');
@@ -228,10 +311,18 @@ form.addEventListener('submit', async e => {
   e.preventDefault();
   const text = textEl.value.trim();
   if (!text || !me) return;
+  if (editing) {
+    const id = editing.id; cancelEdit(); updateSend();
+    try { await updateDoc(doc(db, 'messages', id), { text, edited: serverTimestamp() }); }
+    catch (err) { statusEl.textContent = 'Edit failed (' + ((err && err.code) || 'error') + ')'; }
+    return;
+  }
+  const extra = replying ? { reply: replying } : {};
+  clearReply();
   textEl.value = ''; resize(); updateSend();
   const slow = setTimeout(() => { statusEl.textContent = "Not saved yet — can't reach the database"; }, 8000);
   try {
-    await addDoc(messages, { text, uid: me.uid, name: me.displayName || 'Friend', ts: serverTimestamp() });
+    await addDoc(messages, { text, uid: me.uid, name: me.displayName || 'Friend', ts: serverTimestamp(), ...extra });
     clearTimeout(slow);
     statusEl.textContent = 'Live';
   } catch (err) {
@@ -267,7 +358,7 @@ rcptBtn.addEventListener('click', () => {
 drawRcpt();
 
 const tsMs = t => (t && t.toMillis ? t.toMillis() : 0);
-const rcptKey = f => (f ? tsMs(f.readTs) + '|' + tsMs(f.deliveredTs) : '');
+const rcptKey = f => (f ? tsMs(f.readTs) + '|' + tsMs(f.deliveredTs) + '|' + (f.photo ? f.photo.length : 0) : '');
 
 function touch(extra) {
   if (!me) return;
@@ -300,7 +391,9 @@ function drawPresence() {
   const la = friend ? tsMs(friend.lastActive) : 0;
   const online = !!la && Date.now() - la < 75000;
   el.classList.toggle('on', online);
-  el.textContent = !la ? '' : online ? 'Online' : 'Last seen ' + fmtDay(la) + ', ' + fmtTime(la);
+  const typing = friend && Date.now() - tsMs(friend.typingAt) < 5000;
+  el.classList.toggle('on', online || typing);
+  el.textContent = typing ? 'typing…' : !la ? '' : online ? 'Online' : 'Last seen ' + fmtDay(la) + ', ' + fmtTime(la);
 }
 
 // Heartbeat while the page is visible; browsers pause hidden tabs, so "online" can lag.
@@ -317,6 +410,7 @@ async function sendMedia(kind, media, text, dur) {
   const data = { text, uid: me.uid, name: me.displayName || 'Friend', ts: serverTimestamp(), kind };
   if (media) data.media = media;
   if (dur) data.dur = dur;
+  if (replying) { data.reply = replying; clearReply(); }
   try { await addDoc(messages, data); statusEl.textContent = 'Live'; }
   catch (err) { statusEl.textContent = 'Not sent (' + ((err && err.code) || 'error') + ')'; }
 }
@@ -348,7 +442,13 @@ $('pick').addEventListener('change', async e => {
   const file = e.target.files[0]; e.target.value = '';
   if (!file) return;
   statusEl.textContent = 'Sending photo…';
-  try { sendMedia('image', await shrinkImage(file), '📷 Photo'); }
+  try {
+    if (file.type === 'image/gif') {
+      const url = await toDataUrl(file);
+      if (url.length > 880000) { statusEl.textContent = 'That GIF is too big (max about 600 KB)'; return; }
+      sendMedia('image', url, '🎞️ GIF');
+    } else sendMedia('image', await shrinkImage(file), '📷 Photo');
+  }
   catch (err) { statusEl.textContent = "Couldn't use that photo"; }
 });
 
@@ -389,12 +489,184 @@ $('mic').addEventListener('click', async () => {
 $('recsend').addEventListener('click', () => stopRec(true));
 $('reccancel').addEventListener('click', () => stopRec(false));
 
+// ---- Edit / delete for everyone ----
+function openSheet(m) {
+  sheetMsg = m; const mine = me && m.uid === me.uid;
+  $('sedit').hidden = !(mine && (m.kind === undefined || m.kind === 'text')); $('sdel').hidden = !mine;
+  $('sheet').hidden = false;
+}
+const closeSheet = () => { $('sheet').hidden = true; };
+$('scancel').addEventListener('click', closeSheet);
+$('sheet').addEventListener('click', e => { if (e.target.id === 'sheet') closeSheet(); });
+$('sedit').addEventListener('click', () => {
+  editing = sheetMsg; closeSheet();
+  $('editbar').hidden = false; textEl.value = editing.text; resize(); updateSend(); textEl.focus();
+});
+function cancelEdit() { editing = null; $('editbar').hidden = true; textEl.value = ''; resize(); }
+$('editcancel').addEventListener('click', () => { cancelEdit(); updateSend(); });
+$('sdel').addEventListener('click', async () => {
+  const m = sheetMsg; closeSheet();
+  if (!m) return;
+  try { await updateDoc(doc(db, 'messages', m.id), { deleted: true, text: 'Message deleted', media: deleteField() }); }
+  catch (err) { statusEl.textContent = 'Delete failed (' + ((err && err.code) || 'error') + ')'; }
+});
+
+// ---- Profile photo (a small square copy lives in your status record) ----
+async function makeAvatar(file) {
+  const img = await createImageBitmap(file);
+  const side = Math.min(img.width, img.height), c = document.createElement('canvas');
+  c.width = c.height = 128;
+  c.getContext('2d').drawImage(img, (img.width - side) / 2, (img.height - side) / 2, side, side, 0, 0, 128, 128);
+  return c.toDataURL('image/jpeg', 0.8);
+}
+function drawAvatars() {
+  const f = $('fava'), m = $('mava');
+  f.hidden = !(friend && friend.photo); if (!f.hidden && f.src !== friend.photo) f.src = friend.photo;
+  m.hidden = !(meStatus && meStatus.photo); if (!m.hidden && m.src !== meStatus.photo) m.src = meStatus.photo;
+}
+$('photobtn').addEventListener('click', () => $('avapick').click());
+$('avapick').addEventListener('change', async e => {
+  const file = e.target.files[0]; e.target.value = '';
+  if (!file) return;
+  try { touch({ photo: await makeAvatar(file) }); statusEl.textContent = 'Profile photo updated'; }
+  catch (err) { statusEl.textContent = "Couldn't use that photo"; }
+});
+
+// ---- Reactions, replies, jump to latest ----
+['👍', '❤️', '😂', '😮', '😢', '🙏'].forEach(em => {
+  const b = document.createElement('button'); b.type = 'button'; b.textContent = em;
+  b.addEventListener('click', async () => {
+    const m = sheetMsg; closeSheet();
+    if (!m || !me) return;
+    const had = m.reactions && m.reactions[me.uid] === em;
+    try { await updateDoc(doc(db, 'messages', m.id), { ['reactions.' + me.uid]: had ? deleteField() : em }); }
+    catch (err) { statusEl.textContent = 'Reaction failed (' + ((err && err.code) || 'error') + ')'; }
+  });
+  $('reactrow').append(b);
+});
+$('sreply').addEventListener('click', () => {
+  const m = sheetMsg; closeSheet();
+  if (!m) return;
+  replying = { id: m.id, name: m.name || 'Friend', text: (m.deleted ? 'Message deleted' : m.text || '').slice(0, 80) };
+  $('replytext').textContent = 'Replying to ' + replying.name; $('replybar').hidden = false; textEl.focus();
+});
+function clearReply() { replying = null; $('replybar').hidden = true; }
+$('replycancel').addEventListener('click', clearReply);
+log.addEventListener('scroll', () => { $('jump').hidden = log.scrollHeight - log.scrollTop - log.clientHeight < 200; });
+$('jump').addEventListener('click', () => log.scrollTo({ top: log.scrollHeight, behavior: 'smooth' }));
+
+// ---- Voice calls (WebRTC; Firestore carries the signalling) ----
+const ICE = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] }; // add a TURN server here to help on mobile data
+let pc = null, callId = null, callUnsubs = [], localStream = null, callTimer = null, callStart = 0, incoming = null, pendingIce = [];
+const audioOut = new Audio();
+
+function showCall(title, sub, answer, mute) {
+  $('call').hidden = !title;
+  $('calltext').textContent = title || ''; $('callsub').textContent = sub || '';
+  $('callyes').hidden = !answer; $('callmute').hidden = !mute;
+  $('callno').textContent = answer ? 'Decline' : 'End';
+}
+function flushIce() { pendingIce.forEach(c => pc && pc.addIceCandidate(c).catch(() => {})); pendingIce = []; }
+
+async function setupPC(id, video) {
+  localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: video ? { facingMode: 'user' } : false });
+  $('call').classList.toggle('vid', !!video); $('local').srcObject = video ? localStream : null;
+  pc = new RTCPeerConnection(ICE);
+  localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
+  pc.ontrack = e => { const r = $('remote'); r.srcObject = e.streams[0]; r.play().catch(() => {}); };
+  const ice = collection(db, 'calls', id, 'ice');
+  pc.onicecandidate = e => { if (e.candidate) addDoc(ice, { from: me.uid, c: JSON.stringify(e.candidate) }).catch(() => {}); };
+  callUnsubs.push(onSnapshot(ice, snap => snap.docChanges().forEach(ch => {
+    const d = ch.doc.data();
+    if (ch.type !== 'added' || d.from === me.uid) return;
+    const c = JSON.parse(d.c);
+    if (pc && pc.remoteDescription) pc.addIceCandidate(c).catch(() => {}); else pendingIce.push(c);
+  }), () => {}));
+  pc.onconnectionstatechange = () => {
+    if (!pc) return;
+    if (pc.connectionState === 'connected') {
+      showCall('On call', '0:00', false, true); callStart = Date.now();
+      callTimer = setInterval(() => { $('callsub').textContent = fmtDur(Math.round((Date.now() - callStart) / 1000)); }, 1000);
+    } else if (pc.connectionState === 'failed') endCall(true, 'Call failed — try again');
+  };
+}
+
+function watchCall(id) {
+  callUnsubs.push(onSnapshot(doc(db, 'calls', id), s => {
+    const d = s.data(); if (!d || !pc) return;
+    if (d.answer && !pc.remoteDescription) pc.setRemoteDescription(d.answer).then(flushIce).catch(() => {});
+    if (d.state === 'declined') endCall(false, 'Declined');
+    else if (d.state === 'ended') endCall(false, 'Call ended');
+  }));
+}
+
+function endCall(notify, msg) {
+  const id = callId;
+  callUnsubs.forEach(u => u()); callUnsubs = []; clearInterval(callTimer);
+  if (pc) pc.close(); pc = null;
+  if (localStream) localStream.getTracks().forEach(t => t.stop()); localStream = null;
+  $('remote').srcObject = null; $('local').srcObject = null; $('call').classList.remove('vid'); pendingIce = []; callId = null;
+  if (notify && id) updateDoc(doc(db, 'calls', id), { state: 'ended' }).catch(() => {});
+  showCall(msg || '', '', false, false);
+  if (msg) setTimeout(() => { if (!pc && !incoming) showCall(); }, 2000);
+}
+
+async function startCall(video) {
+  if (pc || incoming || !me) return;
+  const id = 'c' + Date.now() + '-' + me.uid.slice(0, 6);
+  try {
+    showCall('Calling…', 'Waiting for an answer', false, true);
+    callId = id;
+    await setupPC(id, video);
+    const offer = await pc.createOffer(); await pc.setLocalDescription(offer);
+    await setDoc(doc(db, 'calls', id), { from: me.uid, name: me.displayName || 'Friend', offer: { type: offer.type, sdp: offer.sdp }, state: 'ringing', video: !!video, ts: serverTimestamp() });
+    watchCall(id);
+    setTimeout(() => { if (pc && callId === id && !pc.remoteDescription) endCall(true, 'No answer'); }, 45000);
+  } catch (err) { endCall(false, err && err.name === 'NotAllowedError' ? 'Microphone blocked' : "Couldn't start the call"); }
+}
+
+function onCallDoc(id, d) {
+  if (!d || !me || d.from === me.uid) return;
+  if (d.state === 'ringing' && !pc && !incoming && Date.now() - tsMs(d.ts) < 45000) {
+    incoming = { id, offer: d.offer, video: !!d.video };
+    showCall((d.name || 'Friend') + ' is calling…', d.video ? 'Video call' : 'Voice call', true, false);
+    if (navigator.vibrate) navigator.vibrate([300, 200, 300]);
+    setTimeout(() => { if (incoming && incoming.id === id) { incoming = null; showCall(); } }, 45000);
+  } else if (d.state !== 'ringing' && incoming && incoming.id === id) { incoming = null; showCall(); }
+}
+
+$('callbtn').addEventListener('click', () => startCall(false));
+$('vcallbtn').addEventListener('click', () => startCall(true));
+$('callyes').addEventListener('click', async () => {
+  if (!incoming || pc) return;
+  const { id, offer, video } = incoming; incoming = null;
+  try {
+    showCall('Connecting…', '', false, true); callId = id;
+    await setupPC(id, video);
+    await pc.setRemoteDescription(offer); flushIce();
+    const ans = await pc.createAnswer(); await pc.setLocalDescription(ans);
+    await updateDoc(doc(db, 'calls', id), { answer: { type: ans.type, sdp: ans.sdp }, state: 'active' });
+    watchCall(id);
+  } catch (err) { endCall(true, err && err.name === 'NotAllowedError' ? 'Microphone blocked' : "Couldn't connect"); }
+});
+$('callno').addEventListener('click', () => {
+  if (incoming) { const id = incoming.id; incoming = null; updateDoc(doc(db, 'calls', id), { state: 'declined' }).catch(() => {}); showCall(); }
+  else endCall(true);
+});
+$('callmute').addEventListener('click', () => {
+  const t = localStream && localStream.getAudioTracks()[0]; if (!t) return;
+  t.enabled = !t.enabled; $('callmute').textContent = t.enabled ? 'Mute' : 'Unmute';
+});
+
 onAuthStateChanged(auth, u => {
   me = u;
   if (unsub) { unsub(); unsub = null; }
   if (unsubStatus) { unsubStatus(); unsubStatus = null; }
-  friend = null; lastDocs = null; newestTs = null; sentDelivered = 0; sentRead = 0;
+  friend = null; meStatus = null; lastDocs = null; newestTs = null; sentDelivered = 0; sentRead = 0;
   $('subrow').hidden = !u; drawPresence(); $('stickers').hidden = true;
+  if (pc) endCall(true);
+  if (unsubCalls) { unsubCalls(); unsubCalls = null; }
+  incoming = null; showCall(); cancelEdit(); clearReply(); $('jump').hidden = true;
   render.done = false;
   deniedEl.hidden = true;
   authEl.hidden = !!u; log.hidden = !u; form.hidden = !u; signoutBtn.hidden = !u;
@@ -404,11 +676,16 @@ onAuthStateChanged(auth, u => {
   unsubStatus = onSnapshot(statuses, snap => {
     const before = rcptKey(friend);
     friend = null;
-    snap.forEach(d => { if (me && d.id !== me.uid) friend = d.data(); });
+    meStatus = null;
+    snap.forEach(d => { if (!me) return; if (d.id !== me.uid) friend = d.data(); else meStatus = d.data(); });
+    drawAvatars();
     drawPresence();
+    setTimeout(drawPresence, 5200);
     if (before !== rcptKey(friend) && lastDocs) render(lastDocs);
   }, () => {});
   touch();
+  unsubCalls = onSnapshot(query(collection(db, 'calls'), orderBy('ts', 'desc'), limit(1)),
+    snap => snap.docs.forEach(d => onCallDoc(d.id, d.data({ serverTimestamps: 'estimate' }))), () => {});
   unsub = onSnapshot(
     query(messages, orderBy('ts', 'desc'), limit(100)),
     { includeMetadataChanges: true },
